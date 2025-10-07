@@ -29,7 +29,3 @@ O problema de encontrar um plano é reformulado como um problema de encontrar um
 ### Equipe
 
 * Vinícius Santana (vinicius.santana@icomp.ufam.edu.br)
-
----
-
-Este projeto está hospedado em nosso repositório no GitHub.
