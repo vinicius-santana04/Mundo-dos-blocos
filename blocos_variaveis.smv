@@ -1,0 +1,83 @@
+MODULE main
+
+-- 1. CONHECIMENTO DE DOMÍNIO ESTÁTICO (DIMENSÕES E TABELA)
+-- Definindo o tamanho dos blocos (em slots) como constantes (DEFINE)
+DEFINE 
+  SIZE_A := 1;
+  SIZE_B := 1;
+  SIZE_C := 2;
+  SIZE_D := 2;
+  TABLE_WIDTH := 7; -- Grade de slots de 0 a 6
+
+-- 2. VARIÁVEIS DE ESTADO (POSIÇÃO E SUPORTE)
+VAR
+  -- Posição do bloco na mesa (0 a 6) ou sobre outro bloco ('on_B', 'on_C', etc.)
+  -- Representa pos(Block, table(X)) ou pos(Block, on(OtherBlock))
+  pos_a: {0, 1, 2, 3, 4, 5, 6, on_b, on_c, on_d};
+  pos_b: {0, 1, 2, 3, 4, 5, 6, on_a, on_c, on_d};
+  pos_c: {0, 1, 2, 3, 4, 5, 6, on_a, on_b, on_d};
+  pos_d: {0, 1, 2, 3, 4, 5, 6, on_a, on_b, on_c};
+  
+  -- Variável para a ação a ser executada em cada passo de transição
+  action: {none, m_a_1, m_a_on_c, m_c_3, ...};
+
+-- 3. CONHECIMENTO DERIVADO (PRÉ-CONDIÇÕES E RESTRIÇÕES)
+
+-- 3.1. Claredade (clear/1) - Pré-condição de Mobilidade
+-- Um bloco está claro se nenhum outro bloco estiver sobre ele.
+DEFINE
+  clear_a := (pos_b != on_a) & (pos_c != on_a) & (pos_d != on_a);
+  clear_b := (pos_a != on_b) & (pos_c != on_b) & (pos_d != on_b);
+  -- (e assim por diante para C e D)
+
+-- 3.2. Estabilidade (size_check) - Restrição de Empilhamento
+-- Exemplo: Verificar se 'A' (tamanho 1) pode ser colocado sobre 'C' (tamanho 2)
+DEFINE
+  stable_a_on_c := (SIZE_A <= SIZE_C);
+  stable_d_on_a := (SIZE_D <= SIZE_A); -- Será FALSO (2 <= 1)
+
+-- 4. ESTADO INICIAL (INIT)
+-- Exemplo do estado S0 (c(0,2), a(3,1), b(5,1), d sobre a)
+INIT
+  pos_c = 0 & pos_d = on_a & pos_a = 3 & pos_b = 5;
+
+-- 5. TRANSIÇÕES (TRANS) - Lógica de move/2 (CAN, ADDS e DELETES)
+TRANS
+
+-- Exemplo 1: Mover D sobre C (move(d, on(c)))
+(action = m_d_on_c) -> (
+    -- Pré-condições de Mobilidade e Estabilidade
+    clear_d & clear_c & 
+    (pos_d != on_c) &
+    (stable_d_on_c) &
+    (
+      -- Efeitos (Atualização de Estado)
+      next(pos_d) = on_c &
+      next(clear_c) = FALSE & -- O alvo (C) não está mais limpo
+      -- O suporte antigo se torna clear (Se 'd' estava em 'a', 'a' se torna clear)
+      (pos_d = on_a -> next(clear_a) = TRUE) &
+      -- Os outros blocos e estados permanecem inalterados
+      next(pos_a) = pos_a & next(pos_b) = pos_b & next(pos_c) = pos_c
+    )
+  )
+
+-- Exemplo 2: Mover A para a mesa no slot 1 (move(a, table(1)))
+| (action = m_a_1) -> (
+    -- Pré-condições de Mobilidade e Ocupação Espacial
+    clear_a & 
+    (pos_a != 1) & 
+    -- (Aqui entraria a lógica complexa de verificar se os slots de 1 a 1+SIZE_A-1 estão livres)
+    (
+      -- Efeitos (Atualização de Estado)
+      next(pos_a) = 1 & 
+      -- O suporte antigo se torna clear (ex: se 'a' estava em 'd', clear_d se torna TRUE)
+      (pos_a = on_d -> next(clear_d) = TRUE) &
+      -- Os outros blocos permanecem inalterados
+      next(pos_b) = pos_b & next(pos_c) = pos_c & next(pos_d) = pos_d
+    )
+  )
+  
+-- 6. ESPECIFICAÇÃO (Objetivo)
+-- Exemplo: Verificar se o estado S_f3 (d sobre c, a sobre d) é alcançável (considerando S_f3 fisicamente inválido, se for o caso)
+CTLSPEC
+  ! EF (pos_d = on_c & pos_a = on_d)
